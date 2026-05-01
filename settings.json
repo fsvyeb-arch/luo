@@ -31,14 +31,6 @@
             "manual_pnl": 12777,
             "upper": 0.0,
             "lower": 0.0
-        },
-        {
-            "symbol": "00878",
-            "name": "",
-            "shares": 0,
-            "manual_pnl": 0,
-            "upper": 0.0,
-            "lower": 0.0
         }
     ],
     "daily_history": [
