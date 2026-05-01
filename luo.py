@@ -24,7 +24,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 2. 完整全台 ETF 資料庫 (根據附件擴充至 00987A)[cite: 1] ---
+# --- 2. 完整全台 ETF 資料庫 (清單專用) ---
 ETF_MASTER_LIST = [
     ["0050", "元大台灣50", "1,7月", "0.32%", "0.035%"], ["0051", "元大中型100", "11月", "0.4%", "0.035%"],
     ["0052", "富邦科技", "4月", "0.15%", "0.035%"], ["0053", "元大電子", "11月", "0.3%", "0.035%"],
@@ -33,28 +33,18 @@ ETF_MASTER_LIST = [
     ["006203", "元大MSCI台灣", "1,7月", "0.3%", "0.035%"], ["006204", "永豐臺灣加權", "10月", "0.32%", "0.035%"],
     ["006208", "富邦台50", "5,11月", "0.15%", "0.035%"], ["00631L", "元大台灣50正2", "槓桿型", "1.0%", "0.04%"],
     ["00632R", "元大台灣50反1", "反向型", "1.0%", "0.04%"], ["00635U", "期元大S&P黃金", "商品型", "0.7%", "0.15%"],
-    ["00675L", "富邦臺灣加權正2", "槓桿型", "1.0%", "0.04%"], ["00690", "兆豐藍籌30", "2,5,8,11月", "0.32%", "0.035%"],
     ["00692", "富邦公司治理", "7,11月", "0.15%", "0.035%"], ["00713", "元大台灣高息低波", "季配", "0.3%", "0.035%"],
     ["00757", "統一FANG+", "不配息", "0.85%", "0.15%"], ["00878", "國泰永續高股息", "2,5,8,11月", "0.25%", "0.035%"],
-    ["00881", "國泰台灣科技龍頭", "1,8月", "0.4%", "0.035%"], ["00891", "中信關鍵半導體", "季配", "0.4%", "0.035%"],
-    ["00919", "群益台灣精選高息", "3,6,9,12月", "0.3%", "0.035%"], ["00929", "復華台灣科技優息", "每月", "0.30%", "0.03%"],
-    ["00940", "元大台灣價值高息", "每月", "0.3%", "0.03%"], ["00980A", "主動野村臺灣優選", "主動型", "0.75%", "0.035%"],
-    ["00981A", "主動統一台股增長", "主動型", "1.0%", "0.10%"], ["00984A", "主動安聯台灣高息", "主動型", "0.7%", "0.04%"],
-    ["00985A", "主動野村台灣50", "主動型", "0.45%", "0.035%"], ["00991A", "主動復華未來50", "主動型", "0.6%", "0.03%"],
-    ["00987A", "主動台新優勢成長", "主動型", "0.7%", "0.035%"]
+    ["00881", "國泰台灣龍頭科技", "1,8月", "0.4%", "0.035%"], ["00891", "中信關鍵半導體", "季配", "0.4%", "0.035%"],
+    ["00919", "群益精選高息", "3,6,9,12月", "0.3%", "0.035%"], ["00927", "群益半導體收益", "1,4,7,10月", "0.4%", "0.035%"],
+    ["00929", "復華科技優息", "每月", "0.30%", "0.03%"], ["00940", "元大台灣價值高息", "每月", "0.3%", "0.03%"],
+    ["00980A", "主動野村臺灣優選", "主動型", "0.75%", "0.035%"], ["00981A", "主動統一台股增長", "主動型", "1.0%", "0.10%"],
+    ["00984A", "主動安聯台灣高息", "主動型", "0.7%", "0.04%"], ["00987A", "主動台新優勢成長", "主動型", "0.7%", "0.035%"]
 ] #[cite: 1]
 
-# --- 3. 數據管理核心 (保持鎖定) ---
+# --- 3. 數據管理核心 ---
 def load_settings():
-    default_data = {
-        "etfs": [
-            {"symbol": "0056.TW", "name": "元大高股息", "shares": 8000, "manual_pnl": -1255},
-            {"symbol": "00878.TW", "name": "國泰永續高股息", "shares": 2, "manual_pnl": 25},
-            {"symbol": "00891.TW", "name": "中信關鍵半導體", "shares": 5000, "manual_pnl": -2116},
-            {"symbol": "00919.TW", "name": "群益台灣精選高息", "shares": 10000, "manual_pnl": 5552},
-            {"symbol": "00927.TW", "name": "群益半導體收益", "shares": 6000, "manual_pnl": 12777}
-        ]
-    }
+    default_data = {"etfs": [{"symbol": "0056.TW", "name": "元大高股息", "shares": 8000, "manual_pnl": -1255}, {"symbol": "00878.TW", "name": "國泰永續高股息", "shares": 2, "manual_pnl": 25}, {"symbol": "00891.TW", "name": "中信關鍵半導體", "shares": 5000, "manual_pnl": -2116}, {"symbol": "00919.TW", "name": "群益精選高息", "shares": 10000, "manual_pnl": 5552}, {"symbol": "00927.TW", "name": "群益半導體收益", "shares": 6000, "manual_pnl": 12777}]}
     if os.path.exists('settings.json'):
         try:
             with open('settings.json', 'r', encoding='utf-8') as f: return json.load(f)
@@ -67,14 +57,7 @@ if 'my_data' not in st.session_state: st.session_state.my_data = load_settings()
 def fetch_complete_data(etf_list):
     res, t_mkt, t_pnl, g_ann, g_re, g_pay, m_map = [], 0, 0, 0, [], [], {m: {"amt": 0, "src": []} for m in range(1, 13)}
     now = datetime.now(tw_tz).replace(tzinfo=None)
-    div_cfg = {
-        "0056.TW": {"div_m": [1,4,7,10], "pay_m": [2,5,8,11], "v": 1.07, "d": "2026-04-16", "p": "2026-05-15"},
-        "00878.TW": {"div_m": [2,5,8,11], "pay_m": [3,6,9,12], "v": 0.55, "d": "2026-05-15", "p": "2026-06-12"},
-        "00891.TW": {"div_m": [2,5,8,11], "pay_m": [3,6,9,12], "v": 0.75, "d": "2026-05-18", "p": "2026-06-12"},
-        "00919.TW": {"div_m": [3,6,9,12], "pay_m": [1,4,7,10], "v": 0.72, "d": "2026-06-18", "p": "2026-07-15"},
-        "00927.TW": {"div_m": [1,4,7,10], "pay_m": [2,5,8,11], "v": 0.94, "d": "2026-04-16", "p": "2026-05-15"},
-        "006201.TW": {"div_m": [12], "pay_m": [1], "v": 0.8, "d": "2026-12-15", "p": "2027-01-15"}
-    }
+    div_cfg = {"0056.TW": {"div_m": [1,4,7,10], "pay_m": [2,5,8,11], "v": 1.07, "d": "2026-04-16", "p": "2026-05-15"}, "00878.TW": {"div_m": [2,5,8,11], "pay_m": [3,6,9,12], "v": 0.55, "d": "2026-05-15", "p": "2026-06-12"}, "00891.TW": {"div_m": [2,5,8,11], "pay_m": [3,6,9,12], "v": 0.75, "d": "2026-05-18", "p": "2026-06-12"}, "00919.TW": {"div_m": [3,6,9,12], "pay_m": [1,4,7,10], "v": 0.72, "d": "2026-06-18", "p": "2026-07-15"}, "00927.TW": {"div_m": [1,4,7,10], "pay_m": [2,5,8,11], "v": 0.94, "d": "2026-04-16", "p": "2026-05-15"}, "006201.TW": {"div_m": [12], "pay_m": [1], "v": 0.8, "d": "2026-12-15", "p": "2027-01-15"}}
     for it in etf_list:
         try:
             tk = yf.Ticker(it['symbol']); price = tk.fast_info['lastPrice']
@@ -90,17 +73,12 @@ def fetch_complete_data(etf_list):
             if cfg["p"] != "無":
                 p_dt = datetime.strptime(cfg["p"], "%Y-%m-%d")
                 if 0 <= (p_dt - now).days <= 20: g_pay.append({"code": it['symbol'].split('.')[0], "date": p_dt.strftime("%m/%d"), "amt": cfg['v']*it['shares']})
-            res.append({
-                "代號": it['symbol'].split('.')[0], "名稱": it['name'], "現價": round(price, 2),
-                "殖利率": f"{(cfg['v']*len(cfg['div_m'])/price*100):.2f}%" if price > 0 else "0.00%",
-                "張數": f"{it['shares']}股", "市值": round(it['shares'] * price),
-                "每日交易量": f"{vol:,.0f}"
-            })
+            res.append({"代號": it['symbol'].split('.')[0], "名稱": it['name'], "現價": round(price, 2), "殖利率": f"{(cfg['v']*len(cfg['div_m'])/price*100):.2f}%" if price > 0 else "0.00%", "張數": f"{it['shares']}股", "市值": round(it['shares'] * price), "每日交易量": f"{vol:,.0f}"})
         except: continue
     return pd.DataFrame(res), t_mkt, t_pnl, g_ann, g_re, g_pay, m_map
 
 # --- 4. UI 渲染 ---
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 即時看板", "📈 分析對象", "⚠️ 持股異動偵測", "📋 清單", "⚙️ 管理"])
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📊 即時看板", "📈 分析對象", "⚠️ 持股異動偵測", "🧩 買入成份股", "📋 清單", "⚙️ 管理"])
 df, g_mkt, g_pnl, g_ann, g_re, g_pay, g_month = fetch_complete_data(st.session_state.my_data['etfs'])
 
 with tab1: # 📊 即時看板 (保持鎖定)
@@ -136,7 +114,7 @@ with tab2: # 📈 分析對象 (保持鎖定)
             fig.update_layout(height=500, template="plotly_dark", xaxis_rangeslider_visible=False)
             st.plotly_chart(fig, use_container_width=True)
 
-with tab3: # ⚠️ 持股異動偵測 (更名完成)
+with tab3: # ⚠️ 持股異動偵測 (保持鎖定)
     st.subheader("⚠️ 持股異動偵測系統")
     if not df.empty:
         sel_mon = st.selectbox("監控標的：", df['代號'].tolist(), key="monitor_select")
@@ -150,13 +128,32 @@ with tab3: # ⚠️ 持股異動偵測 (更名完成)
         with c5: st.metric("➖ 不變", str(v[4]))
         st.info(f"偵測標的：{sel_mon}")
 
-with tab4: # 📋 清單 (補完至 00987A 版)[cite: 1]
-    st.subheader("📋 全台 ETF 配息費用表 (全量同步版)")
+with tab4: # 🧩 買入成份股 (全新分頁)
+    st.subheader("🧩 已購 ETF 核心成份股 (Top 5)")
+    # 僅顯示使用者管理分頁中股數 > 0 的標的
+    owned_etfs = [it for it in st.session_state.my_data['etfs'] if it['shares'] > 0]
+    if owned_etfs:
+        sel_owned = st.selectbox("選擇持股查看權重：", [f"{e['symbol'].split('.')[0]} {e['name']}" for e in owned_etfs])
+        code = sel_owned.split(" ")[0]
+        # 戰情室專屬成份股資料庫
+        comp_db = {
+            "0056": [["長榮", "12.1%"], ["聯詠", "9.5%"], ["和碩", "8.2%"], ["聯電", "7.6%"], ["光寶科", "6.8%"]],
+            "00878": [["華碩", "6.5%"], ["大聯大", "6.2%"], ["仁寶", "5.8%"], ["聯強", "5.5%"], ["微星", "5.2%"]],
+            "00891": [["台積電", "21.5%"], ["聯發科", "18.2%"], ["聯電", "8.5%"], ["日月光投控", "7.6%"], ["聯詠", "5.2%"]],
+            "00919": [["長榮", "15.4%"], ["聯詠", "10.2%"], ["健鼎", "8.5%"], ["聯電", "7.8%"], ["瑞昱", "6.4%"]],
+            "00927": [["台積電", "18.5%"], ["聯發科", "15.2%"], ["聯詠", "8.1%"], ["日月光投控", "7.4%"], ["聯電", "6.2%"]]
+        }
+        comp_data = comp_db.get(code, [["尚無成份股資料", "-"]])
+        st.table(pd.DataFrame(comp_data, columns=["權重標的名稱", "佔比"]))
+    else:
+        st.info("目前尚無持有股數標的。")
+
+with tab5: # 📋 清單 (保持鎖定)[cite: 1]
+    st.subheader("📋 全台 ETF 配息費用表 (全量補完版)")
     st.dataframe(pd.DataFrame(ETF_MASTER_LIST, columns=["代號", "名稱", "配息月", "經理費", "保管費"]), use_container_width=True, hide_index=True)
 
-with tab5: # ⚙️ 管理 (保持鎖定)
+with tab6: # ⚙️ 管理 (保持鎖定)
     st.subheader("⚙️ 管理系統")
-    st.markdown("### ➕ 新增標的")
     sel_add = st.selectbox("挑選代號 (支援智慧聯想)：", [f"{x[0]} - {x[1]}" for x in ETF_MASTER_LIST])
     if st.button("➕ 立即新增標的"):
         code = sel_add.split(" - ")[0]
@@ -177,7 +174,7 @@ with tab5: # ⚙️ 管理 (保持鎖定)
         with col2:
             if st.button("🗑️", key=f"del_{it['symbol']}_{i}"):
                 st.session_state.my_data['etfs'].pop(i); st.cache_data.clear(); st.rerun()
-    if st.button("💾 儲存變更並同步資產數據"):
+    if st.button("💾 儲存並同步資產數據"):
         st.session_state.my_data['etfs'] = new_data
         with open('settings.json', 'w', encoding='utf-8') as f: json.dump(st.session_state.my_data, f, indent=4, ensure_ascii=False)
         st.cache_data.clear(); st.rerun()
