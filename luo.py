@@ -32,7 +32,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 2. 數據管理 (含中文名稱映射) ---
+# --- 2. 數據管理 ---
 SETTINGS_FILE = 'settings.json'
 NAME_MAP = {
     "0056.TW": "元大高股息", "00878.TW": "國泰永續高股息", 
@@ -45,18 +45,16 @@ def save_to_json(data):
         json.dump(data, f, indent=4, ensure_ascii=False)
 
 def load_settings():
-    # 預設持股：0056 (8張), 00927 (6張)
     default_data = {"etfs": [
         {"symbol": "0056.TW", "name": "元大高股息", "shares": 8000, "manual_pnl": 0},
         {"symbol": "00927.TW", "name": "群益半導體收益", "shares": 6000, "manual_pnl": 0},
-        {"symbol": "00878.TW", "name": "國泰永續高股息", "shares": 10000, "manual_pnl": 0},
-        {"symbol": "00919.TW", "name": "群益台灣精選高息", "shares": 10000, "manual_pnl": 0},
+        {"symbol": "00878.TW", "name": "國泰永續高股息", "shares": 13000, "manual_pnl": 0},
+        {"symbol": "00919.TW", "name": "群益台灣精選高息", "shares": 12000, "manual_pnl": 0},
         {"symbol": "00891.TW", "name": "中信臺灣智慧50", "shares": 10000, "manual_pnl": 0}
     ]}
     if os.path.exists(SETTINGS_FILE):
         try:
-            with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
+            with open(SETTINGS_FILE, 'r', encoding='utf-8') as f: return json.load(f)
         except: return default_data
     return default_data
 
@@ -67,11 +65,10 @@ if 'my_data' not in st.session_state:
 @st.cache_data(ttl=10)
 def fetch_analysis(etf_list):
     res, reminders, pay_reminders = [], [], []
-    t_mkt, t_pnl, t_cost, t_day_chg, annual_total = 0, 0, 0, 0, 0
+    t_mkt, t_pnl, t_cost, t_day, annual_total = 0, 0, 0, 0, 0
     m_stats = {f"{m}月": {"total": 0, "detail": []} for m in range(1, 13)}
     now_tw = datetime.now(tw_tz).replace(tzinfo=None)
     
-    # 🎯 股息數據預設 (2026 預估)
     div_cfg = {
         "0056.TW": {"m": [1, 4, 7, 10], "d": "2026-07-16", "p": "2026-05-15", "v": 1.07},
         "00927.TW": {"m": [1, 4, 7, 10], "d": "2026-07-16", "p": "2026-05-15", "v": 0.94},
@@ -88,7 +85,6 @@ def fetch_analysis(etf_list):
             prev_close = f_info.get('regularMarketPreviousClose', curr_p)
             cfg = div_cfg.get(item['symbol'], {"m": [], "d": "無", "p": "無", "v": 0.0})
             
-            # 殖利率與配息
             dy_yield = (cfg['v'] / curr_p * 100) if curr_p > 0 else 0
             cash = cfg['v'] * item['shares']
             for m in cfg["m"]:
@@ -98,15 +94,14 @@ def fetch_analysis(etf_list):
 
             t_mkt += (item['shares'] * curr_p)
             t_pnl += item['manual_pnl']
-            t_cost += (item['shares'] * prev_close) # 成本隨股市收盤自動更新
-            t_day_chg += (curr_p - prev_close) * item['shares']
+            t_cost += (item['shares'] * prev_close)
+            t_day += (curr_p - prev_close) * item['shares']
             
             res.append({
-                "代號": item['symbol'].split('.')[0], "現價": round(curr_p, 2), "殖利率": dy_yield,
-                "今日漲跌": (curr_p - prev_close) * item['shares'], "累積損益": item['manual_pnl'],
-                "張數": f"{int(item['shares']/1000)}張", "股息": cfg['v'], "市值": item['shares'] * curr_p
+                "代號": item['symbol'].split('.')[0], "名稱": item['name'], "現價": round(curr_p, 2), "殖利率": f"{dy_yield:.2f}%",
+                "昨日收盤": round(prev_close, 2), "今日漲跌": (curr_p - prev_close) * item['shares'],
+                "累積損益": item['manual_pnl'], "張數": f"{int(item['shares']/1000)}張", "市值": item['shares'] * curr_p
             })
-            
             if cfg["d"] != "無":
                 d_dt = datetime.strptime(cfg["d"], "%Y-%m-%d")
                 if 0 <= (d_dt - now_tw).days <= 30: reminders.append({"code": item['symbol'].split('.')[0], "date": d_dt.strftime("%m/%d")})
@@ -114,51 +109,56 @@ def fetch_analysis(etf_list):
                 p_dt = datetime.strptime(cfg["p"], "%Y-%m-%d")
                 if 0 <= (p_dt - now_tw).days <= 14: pay_reminders.append({"code": item['symbol'].split('.')[0], "date": p_dt.strftime("%m/%d"), "amount": cash})
         except: continue
-    return pd.DataFrame(res), t_mkt, t_pnl, t_cost, m_stats, annual_total, reminders, t_day_chg, pay_reminders
+    return pd.DataFrame(res), t_mkt, t_pnl, t_cost, m_stats, annual_total, reminders, t_day, pay_reminders
 
 # --- 4. 畫面渲染 ---
 df, g_mkt, g_pnl, g_cost, g_months, g_annual, g_re, g_day, g_pay = fetch_analysis(st.session_state.my_data['etfs'])
 
-st.title("👾 羅小翔專用：終極戰情室")
+st.title("👾 羅小翔：ETF 實時戰情室")
 
-# 雙重雷達
-col_re1, col_re2 = st.columns(2)
-with col_re1:
+# 雷達區
+c_re1, c_re2 = st.columns(2)
+with c_re1:
     if g_re:
-        for r in g_re: st.markdown(f'<div class="lightning-box"><b style="font-size: 22px;">⚡ 除息提醒 ⚡</b><br>標的 <b>{r["code"]}</b> 將於 <b>{r["date"]}</b> 除息</div>', unsafe_allow_html=True)
-with col_re2:
+        for r in g_re: st.markdown(f'<div class="lightning-box"><b style="font-size:22px;">⚡ 除息提醒</b><br>{r["code"]} 將於 {r["date"]} 除息</div>', unsafe_allow_html=True)
+with c_re2:
     if g_pay:
-        for p in g_pay: st.markdown(f'<div class="gold-box"><b style="font-size: 22px;">🪙 領息提醒 🪙</b><br>標的 <b>{p["code"]}</b> 股息約 <b>${p["amount"]:,.0f}</b> 將於 <b>{p["date"]}</b> 入帳！</div>', unsafe_allow_html=True)
+        for p in g_pay: st.markdown(f'<div class="gold-box"><b style="font-size:22px;">🪙 領息提醒</b><br>{p["code"]} 股息約 ${p["amount"]:,.0f} 於 {p["date"]} 入帳</div>', unsafe_allow_html=True)
 
-# 損益面板
-d_color = "#FF4B4B" if g_day >= 0 else "#09AB3B"
-p_color = "#FF4B4B" if g_pnl >= 0 else "#09AB3B"
+# 損益看板
+d_c, p_c = ("#FF4B4B" if g_day >= 0 else "#09AB3B"), ("#FF4B4B" if g_pnl >= 0 else "#09AB3B")
 c1, c2 = st.columns(2)
-with c1: st.markdown(f"<div style='background-color:#f0f2f6; padding:15px; border-radius:12px; text-align:center;'>今日即時損益<h2 style='color:{d_color}; margin:0;'>${g_day:+,.0f}</h2></div>", unsafe_allow_html=True)
-with c2: st.markdown(f"<div style='background-color:#f0f2f6; padding:15px; border-radius:12px; text-align:center;'>累積總損益<h2 style='color:{p_color}; margin:0;'>${g_pnl:,.0f}</h2></div>", unsafe_allow_html=True)
+with c1: st.markdown(f"<div style='background-color:#f0f2f6; padding:15px; border-radius:12px; text-align:center;'>今日即時損益<h2 style='color:{d_c};'>${g_day:+,.0f}</h2></div>", unsafe_allow_html=True)
+with c2: st.markdown(f"<div style='background-color:#f0f2f6; padding:15px; border-radius:12px; text-align:center;'>累積總損益<h2 style='color:{p_c};'>${g_pnl:,.0f}</h2></div>", unsafe_allow_html=True)
 
-# 資產概況 (解決語法錯誤的邏輯)
-st.write("")
+# 資產總覽
 g_roi = (g_pnl / g_cost * 100) if g_cost > 0 else 0
-roi_color = "#FF4B4B" if g_roi >= 0 else "#09AB3B"
+roi_c = "#FF4B4B" if g_roi >= 0 else "#09AB3B"
+ca, cb, cc = st.columns(3)
+with ca: st.markdown(f"<div style='border:1px solid #ddd; padding:10px; border-radius:10px; text-align:center;'><small>股票總市值</small><h3 style='margin:0;'>${g_mkt:,.0f}</h3></div>", unsafe_allow_html=True)
+with cb: st.markdown(f"<div style='border:1px solid #ddd; padding:10px; border-radius:10px; text-align:center;'><small>總成本</small><h3 style='margin:0;'>${g_cost:,.0f}</h3></div>", unsafe_allow_html=True)
+with cc: st.markdown(f"<div style='border:1px solid #ddd; padding:10px; border-radius:10px; text-align:center;'><small>總報酬率</small><h3 style='color:{roi_c}; margin:0;'>{g_roi:+.2f}%</h3></div>", unsafe_allow_html=True)
 
-col_a, col_b, col_c = st.columns(3)
-with col_a: st.markdown(f"<div style='border:1px solid #ddd; padding:10px; border-radius:10px; text-align:center;'><small>股票總市值</small><h3 style='margin:0;'>${g_mkt:,.0f}</h3></div>", unsafe_allow_html=True)
-with col_b: st.markdown(f"<div style='border:1px solid #ddd; padding:10px; border-radius:10px; text-align:center;'><small>總成本 (每日更新)</small><h3 style='margin:0;'>${g_cost:,.0f}</h3></div>", unsafe_allow_html=True)
-with col_c: st.markdown(f"<div style='border:1px solid #ddd; padding:10px; border-radius:10px; text-align:center;'><small>總報酬率</small><h3 style='color:{roi_color}; margin:0;'>{g_roi:+.2f}%</h3></div>", unsafe_allow_html=True)
-
-# 持股清單
+# 表格區
 st.divider()
 if not df.empty:
     st.dataframe(
-        df.style.format({"現價": "{:.2f}", "殖利率": "{:.2f}%", "市值": "{:,.0f}", "累積損益": "{:,.0f}", "今日漲跌": "{:+,.0f}", "股息": "{:.2f}"})
+        df.style.format({"現價": "{:.2f}", "昨日收盤": "{:.2f}", "市值": "{:,.0f}", "累積損益": "{:,.0f}", "今日漲跌": "{:+,.0f}"})
         .map(lambda x: f'color:{"red" if (isinstance(x, (int,float)) and x>0) or str(x).startswith("+") else "green" if (isinstance(x, (int,float)) and x<0) or str(x).startswith("-") else "black"};font-weight:bold;', subset=['累積損益', '今日漲跌']),
         use_container_width=True, hide_index=True
     )
 
-# 月領息預估
+# --- 📥 整合匯出功能 (摘要 + 明細) ---
+summary_df = pd.DataFrame({
+    "項目": ["紀錄時間", "今日即時損益", "累積總損益", "股票總市值", "總成本", "總報酬率"],
+    "數值": [datetime.now(tw_tz).strftime('%Y-%m-%d %H:%M'), f"{g_day:+,.0f}", f"{g_pnl:,.0f}", f"{g_mkt:,.0f}", f"{g_cost:,.0f}", f"{g_roi:+.2f}%"]
+})
+final_csv = "=== 戰情總覽摘要 ===\n" + summary_df.to_csv(index=False) + "\n\n=== 持股詳細明細 ===\n" + df.to_csv(index=False)
+st.download_button(label="📥 匯出今日完整戰情(含總覽摘要)至 Excel", data=final_csv.encode('utf-8-sig'), file_name=f"ETF_Full_Report_{datetime.now(tw_tz).strftime('%Y%m%d')}.csv", mime="text/csv", use_container_width=True)
+
+# --- 🗓️ 全年領息預估 ---
 st.divider()
-st.subheader("🗓️ 全年領息預估 (按月)")
+st.subheader("🗓️ 全年領息預估")
 for i in range(1, 13, 2):
     m1, m2 = f"{i}月", f"{i+1}月"
     cl1, cl2 = st.columns(2)
@@ -175,7 +175,7 @@ for i in range(1, 13, 2):
 
 st.markdown(f"<div style='background-color:#e8f4fd; padding:18px 15px; border-radius:10px; margin-top:20px; border-left: 6px solid #0056b3; display:flex; justify-content:space-between; align-items:center;'><div><span style='font-size:18px; font-weight:900; color:#0056b3;'>🏆 全年預估領息總計</span></div><div style='text-align:right;'><span style='color:#0056b3; font-weight:900; font-size:26px;'>${g_annual:,.0f}</span></div></div>", unsafe_allow_html=True)
 
-# 標的管理
+# --- ⚙️ 標的管理系統 ---
 st.divider()
 st.subheader("⚙️ 標的管理系統")
 with st.expander("➕ 新增 ETF 標的"):
@@ -197,7 +197,7 @@ with st.expander("➕ 新增 ETF 標的"):
             save_to_json(st.session_state.my_data)
             st.rerun()
 
-with st.expander("⚙️ 修改與刪除持股"):
+with st.expander("⚙️ 修改與刪除"):
     up_list, del_idx = [], -1
     for i, item in enumerate(st.session_state.my_data.get('etfs', [])):
         st.markdown(f"**{item['name']} ({item['symbol']})**")
@@ -211,8 +211,8 @@ with st.expander("⚙️ 修改與刪除持股"):
         st.session_state.my_data['etfs'].pop(del_idx)
         save_to_json(st.session_state.my_data)
         st.rerun()
-    if st.button("💾 儲存並更新數據"):
+    if st.button("💾 儲存更新"):
         st.session_state.my_data['etfs'] = up_list
         save_to_json(st.session_state.my_data)
-        st.success("數據儲存成功！")
+        st.success("儲存成功！")
         st.rerun()
