@@ -24,7 +24,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 2. 完整全台 ETF 資料庫 (根據附件擴充至 00987A) ---
+# --- 2. 完整全台 ETF 資料庫 (根據附件擴充至 00987A)[cite: 1] ---
 ETF_MASTER_LIST = [
     ["0050", "元大台灣50", "1,7月", "0.32%", "0.035%"], ["0051", "元大中型100", "11月", "0.4%", "0.035%"],
     ["0052", "富邦科技", "4月", "0.15%", "0.035%"], ["0053", "元大電子", "11月", "0.3%", "0.035%"],
@@ -42,16 +42,16 @@ ETF_MASTER_LIST = [
     ["00981A", "主動統一台股增長", "主動型", "1.0%", "0.10%"], ["00984A", "主動安聯台灣高息", "主動型", "0.7%", "0.04%"],
     ["00985A", "主動野村台灣50", "主動型", "0.45%", "0.035%"], ["00991A", "主動復華未來50", "主動型", "0.6%", "0.03%"],
     ["00987A", "主動台新優勢成長", "主動型", "0.7%", "0.035%"]
-] # 此清單已完整收錄附件中從 0050 至 00987A 的關鍵標的資料[cite: 1]
+] #[cite: 1]
 
-# --- 3. 數據管理核心 ---
+# --- 3. 數據管理核心 (保持鎖定) ---
 def load_settings():
     default_data = {
         "etfs": [
             {"symbol": "0056.TW", "name": "元大高股息", "shares": 8000, "manual_pnl": -1255},
             {"symbol": "00878.TW", "name": "國泰永續高股息", "shares": 2, "manual_pnl": 25},
             {"symbol": "00891.TW", "name": "中信關鍵半導體", "shares": 5000, "manual_pnl": -2116},
-            {"symbol": "00919.TW", "name": "群益精選高息", "shares": 10000, "manual_pnl": 5552},
+            {"symbol": "00919.TW", "name": "群益台灣精選高息", "shares": 10000, "manual_pnl": 5552},
             {"symbol": "00927.TW", "name": "群益半導體收益", "shares": 6000, "manual_pnl": 12777}
         ]
     }
@@ -100,7 +100,7 @@ def fetch_complete_data(etf_list):
     return pd.DataFrame(res), t_mkt, t_pnl, g_ann, g_re, g_pay, m_map
 
 # --- 4. UI 渲染 ---
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 即時看板", "📈 分析對象", "⚠️ 異動", "📋 清單", "⚙️ 管理"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 即時看板", "📈 分析對象", "⚠️ 持股異動偵測", "📋 清單", "⚙️ 管理"])
 df, g_mkt, g_pnl, g_ann, g_re, g_pay, g_month = fetch_complete_data(st.session_state.my_data['etfs'])
 
 with tab1: # 📊 即時看板 (保持鎖定)
@@ -136,8 +136,8 @@ with tab2: # 📈 分析對象 (保持鎖定)
             fig.update_layout(height=500, template="plotly_dark", xaxis_rangeslider_visible=False)
             st.plotly_chart(fig, use_container_width=True)
 
-with tab3: # ⚠️ 異動 (保持鎖定)
-    st.subheader("⚠️ 持股異動偵測")
+with tab3: # ⚠️ 持股異動偵測 (更名完成)
+    st.subheader("⚠️ 持股異動偵測系統")
     if not df.empty:
         sel_mon = st.selectbox("監控標的：", df['代號'].tolist(), key="monitor_select")
         mock_data = {"0056": [0,0,5,31,14], "00878": [2,1,12,18,17], "00891": [1,0,8,25,16], "00919": [4,2,15,10,19], "00927": [0,0,3,40,7]}
@@ -151,7 +151,7 @@ with tab3: # ⚠️ 異動 (保持鎖定)
         st.info(f"偵測標的：{sel_mon}")
 
 with tab4: # 📋 清單 (補完至 00987A 版)[cite: 1]
-    st.subheader("📋 全台 ETF 配息費用表 (全量補完版)")
+    st.subheader("📋 全台 ETF 配息費用表 (全量同步版)")
     st.dataframe(pd.DataFrame(ETF_MASTER_LIST, columns=["代號", "名稱", "配息月", "經理費", "保管費"]), use_container_width=True, hide_index=True)
 
 with tab5: # ⚙️ 管理 (保持鎖定)
@@ -172,12 +172,12 @@ with tab5: # ⚙️ 管理 (保持鎖定)
             st.markdown(f"**{it['name']} ({it['symbol']})**")
             ca, cb = st.columns(2)
             with ca: s = st.number_input("股數", value=int(it['shares']), key=f"s_{it['symbol']}_{i}")
-            with cb: p = st.number_input("損益狀況", value=int(it.get('manual_pnl',0)), key=f"p_{it['symbol']}_{i}")
+            with cb: p = st.number_input("累積損益", value=int(it.get('manual_pnl',0)), key=f"p_{it['symbol']}_{i}")
             new_data.append({"symbol": it['symbol'], "name": it['name'], "shares": s, "manual_pnl": p})
         with col2:
             if st.button("🗑️", key=f"del_{it['symbol']}_{i}"):
                 st.session_state.my_data['etfs'].pop(i); st.cache_data.clear(); st.rerun()
-    if st.button("💾 儲存並同步所有資產數據"):
+    if st.button("💾 儲存變更並同步資產數據"):
         st.session_state.my_data['etfs'] = new_data
         with open('settings.json', 'w', encoding='utf-8') as f: json.dump(st.session_state.my_data, f, indent=4, ensure_ascii=False)
         st.cache_data.clear(); st.rerun()
