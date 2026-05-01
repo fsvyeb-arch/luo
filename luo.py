@@ -33,10 +33,10 @@ ETF_MASTER_LIST = [
     ["006203", "元大摩臺台灣", "1,7月", "0.3%", "0.035%"], ["006204", "永豐臺灣加權", "10月", "0.32%", "0.035%"],
     ["006208", "富邦台50", "5,11月", "0.15%", "0.035%"], ["00690", "兆豐藍籌30", "2,5,8,11月", "0.32%", "0.035%"],
     ["00692", "富邦公司治理", "7,11月", "0.15%", "0.035%"], ["00701", "國泰股利精選30", "1,8月", "0.3%", "0.035%"],
-    ["00713", "元大高息低波", "11月", "0.3%", "0.035%"], ["00728", "第一金工業30", "季配", "0.4%", "0.035%"],
+    ["00713", "元大台灣高息低波", "11月", "0.3%", "0.035%"], ["00728", "第一金工業30", "季配", "0.4%", "0.035%"],
     ["00730", "富邦優質高息", "每個月", "0.45%", "0.035%"], ["00731", "復華高息低波", "季配", "0.3%", "0.035%"],
     ["00733", "富邦臺灣中小", "5,10月", "0.4%", "0.035%"], ["00850", "元大臺灣ESG永續", "11月", "0.3%", "0.035%"],
-    ["00878", "國泰永續高股息", "2,5,8,11月", "0.25%", "0.035%"], ["00881", "國泰台灣5G+", "1,8月", "0.4%", "0.035%"],
+    ["00878", "國泰永續ESG高股息", "2,5,8,11月", "0.25%", "0.035%"], ["00881", "國泰台灣5G+", "1,8月", "0.4%", "0.035%"],
     ["00888", "永豐ESG永續優質", "1,4,7,10月", "0.25%", "0.03%"], ["00891", "中信關鍵半導體", "季配", "0.4%", "0.035%"],
     ["00892", "富邦核心半導體", "不配息", "0.4%", "0.035%"], ["00894", "中信特選小資30", "季配", "0.4%", "0.035%"],
     ["00896", "中信綠能電動車", "季配", "0.4%", "0.035%"], ["00900", "富邦特選高息30", "季配", "0.3%", "0.035%"],
@@ -63,7 +63,7 @@ ETF_MASTER_LIST = [
     ["00981T", "平衡凱基雙核收息", "年配", "0.60%", "0.10%"]
 ]
 
-# --- 3. 持久化數據核心 (保持鎖定) ---
+# --- 3. 數據管理核心 (保持鎖定) ---
 def load_settings():
     default_data = {
         "etfs": [
@@ -97,6 +97,7 @@ def fetch_complete_data(etf_list):
     for it in etf_list:
         try:
             tk = yf.Ticker(it['symbol']); price = tk.fast_info['lastPrice']
+            vol = tk.fast_info['lastVolume']
             t_mkt += (it['shares'] * price); t_pnl += it.get('manual_pnl', 0)
             cfg = div_cfg.get(it['symbol'], {"div_m": [], "pay_m": [], "v": 0.0, "d": "無", "p": "無"})
             g_ann += (cfg['v'] * it['shares'] * len(cfg['div_m']))
@@ -108,15 +109,20 @@ def fetch_complete_data(etf_list):
             if cfg["p"] != "無":
                 p_dt = datetime.strptime(cfg["p"], "%Y-%m-%d")
                 if 0 <= (p_dt - now).days <= 20: g_pay.append({"code": it['symbol'].split('.')[0], "date": p_dt.strftime("%m/%d"), "amt": cfg['v']*it['shares']})
-            res.append({"代號": it['symbol'].split('.')[0], "名稱": it['name'], "現價": round(price, 2), "殖利率": f"{(cfg['v']*len(cfg['div_m'])/price*100):.2f}%" if price > 0 else "0.00%", "張數": f"{it['shares']}股", "市值": round(it['shares'] * price)})
+            res.append({
+                "代號": it['symbol'].split('.')[0], "名稱": it['name'], "現價": round(price, 2),
+                "殖利率": f"{(cfg['v']*len(cfg['div_m'])/price*100):.2f}%" if price > 0 else "0.00%",
+                "張數": f"{it['shares']}股", "市值": round(it['shares'] * price),
+                "每日交易量": f"{vol:,.0f}"
+            })
         except: continue
     return pd.DataFrame(res), t_mkt, t_pnl, g_ann, g_re, g_pay, m_map
 
 # --- 4. UI 渲染 ---
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 看板", "📈 分析", "⚠️ 異動", "📋 清單", "⚙️ 管理"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 即時看板", "📈 分析對象", "⚠️ 異動", "📋 清單", "⚙️ 管理"])
 df, g_mkt, g_pnl, g_ann, g_re, g_pay, g_month = fetch_complete_data(st.session_state.my_data['etfs'])
 
-with tab1: # 📊 看板 (保持鎖定)
+with tab1: # 📊 即時看板 (保持鎖定)
     c_l, c_r = st.columns(2)
     with c_l:
         for r in g_re: st.markdown(f'<div class="lightning-box">⚡ <b>除息雷達</b><br>{r["code"]} 於 {r["date"]} 除息</div>', unsafe_allow_html=True)
@@ -135,7 +141,7 @@ with tab1: # 📊 看板 (保持鎖定)
             st.caption(f"{', '.join(g_month[m]['src'])}")
     st.dataframe(df, use_container_width=True, hide_index=True)
 
-with tab2: # 📈 分析 (保持鎖定)
+with tab2: # 📈 分析對象 (保持鎖定)
     if not df.empty:
         target = st.selectbox("分析對象：", df['名稱'].tolist())
         sym = next(it['symbol'] for it in st.session_state.my_data['etfs'] if it['name'] == target)
@@ -149,7 +155,7 @@ with tab2: # 📈 分析 (保持鎖定)
             fig.update_layout(height=500, template="plotly_dark", xaxis_rangeslider_visible=False)
             st.plotly_chart(fig, use_container_width=True)
 
-with tab3: # ⚠️ 異動 (保持鎖定)
+with tab3: # ⚠️ 持股異動偵測 (保持鎖定)
     st.subheader("⚠️ 持股異動偵測")
     if not df.empty:
         sel_mon = st.selectbox("監控標的：", df['代號'].tolist(), key="monitor_select")
@@ -163,15 +169,16 @@ with tab3: # ⚠️ 異動 (保持鎖定)
         with c5: st.metric("➖ 不變", str(v[4]))
         st.info(f"偵測標的：{sel_mon}")
 
-with tab4: # 📋 清單 (回歸 69 檔)
+with tab4: # 📋 清單 (保持鎖定)
     st.subheader("📋 全台 ETF 配息費用表 (69 檔全收錄)")
     st.dataframe(pd.DataFrame(ETF_MASTER_LIST, columns=["代號", "名稱", "配息月", "經理費", "保管費"]), use_container_width=True, hide_index=True)
 
-with tab5: # ⚙️ 管理 (保持鎖定)
+with tab5: # ⚙️ 管理 (搜尋聯想優化)
     st.subheader("⚙️ 管理系統")
     st.markdown("### ➕ 新增標的")
-    sel_add = st.selectbox("挑選代號：", [f"{x[0]} - {x[1]}" for x in ETF_MASTER_LIST])
-    if st.button("➕ 立即新增"):
+    # 將 selectbox 改為搜尋聯想選單
+    sel_add = st.selectbox("挑選代號 (支援關鍵字/數字聯想)：", [f"{x[0]} - {x[1]}" for x in ETF_MASTER_LIST])
+    if st.button("➕ 立即新增標的"):
         code = sel_add.split(" - ")[0]
         name = next(x[1] for x in ETF_MASTER_LIST if x[0] == code)
         st.session_state.my_data['etfs'].append({"symbol": f"{code}.TW", "name": name, "shares": 0, "manual_pnl": 0})
@@ -185,12 +192,12 @@ with tab5: # ⚙️ 管理 (保持鎖定)
             st.markdown(f"**{it['name']} ({it['symbol']})**")
             ca, cb = st.columns(2)
             with ca: s = st.number_input("股數", value=int(it['shares']), key=f"s_{it['symbol']}_{i}")
-            with cb: p = st.number_input("損益", value=int(it.get('manual_pnl',0)), key=f"p_{it['symbol']}_{i}")
+            with cb: p = st.number_input("累積損益", value=int(it.get('manual_pnl',0)), key=f"p_{it['symbol']}_{i}")
             new_data.append({"symbol": it['symbol'], "name": it['name'], "shares": s, "manual_pnl": p})
         with col2:
             if st.button("🗑️", key=f"del_{it['symbol']}_{i}"):
                 st.session_state.my_data['etfs'].pop(i); st.cache_data.clear(); st.rerun()
-    if st.button("💾 儲存並同步"):
+    if st.button("💾 儲存所有變更並同步資產"):
         st.session_state.my_data['etfs'] = new_data
         with open('settings.json', 'w', encoding='utf-8') as f: json.dump(st.session_state.my_data, f, indent=4, ensure_ascii=False)
         st.cache_data.clear(); st.rerun()

@@ -23,6 +23,12 @@
             "name": "群益半導體收益",
             "shares": 6000,
             "manual_pnl": 12777
+        },
+        {
+            "symbol": "0050.TW",
+            "name": "元大台灣50",
+            "shares": 0,
+            "manual_pnl": 0
         }
     ],
     "daily_history": [
