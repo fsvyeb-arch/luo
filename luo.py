@@ -27,7 +27,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 2. 數據管理 (含備忘錄儲存) ---
+# --- 2. 數據管理 ---
 SETTINGS_FILE = 'settings.json'
 
 def save_to_json(data):
@@ -35,13 +35,12 @@ def save_to_json(data):
         json.dump(data, f, indent=4, ensure_ascii=False)
 
 def load_settings():
-    # 預設資料，包含 0056 (8張) 與 00927 (6張)
     default_data = {
         "etfs": [
-            {"symbol": "0056.TW", "name": "元大高股息", "shares": 8000, "manual_pnl": 0, "upper": 0.0, "lower": 0.0},
-            {"symbol": "00927.TW", "name": "群益半導體收益", "shares": 6000, "manual_pnl": 0, "upper": 0.0, "lower": 0.0}
+            {"symbol": "0056.TW", "name": "元大高股息", "shares": 8000, "manual_pnl": -1255, "upper": 0.0, "lower": 0.0},
+            {"symbol": "00927.TW", "name": "群益半導體收益", "shares": 6000, "manual_pnl": 12777, "upper": 0.0, "lower": 0.0}
         ],
-        "memo": "在這裡輸入你的操盤心得或重要筆記..."
+        "memo": ""
     }
     if os.path.exists(SETTINGS_FILE):
         try:
@@ -84,9 +83,9 @@ def fetch_analysis(etf_list):
             price_map[item['symbol']] = curr_p
             
             if item.get('upper', 0) > 0 and curr_p >= item['upper']:
-                p_alerts.append(f"🚀 {item['name']} 達標止盈！現價 {curr_p:.2f}")
+                p_alerts.append(f"🚀 {item['name']} 止盈點觸發！價格：{curr_p:.2f}")
             if item.get('lower', 0) > 0 and curr_p <= item['lower']:
-                p_alerts.append(f"📉 {item['name']} 跌破低接！現價 {curr_p:.2f}")
+                p_alerts.append(f"📉 {item['name']} 低接點觸發！價格：{curr_p:.2f}")
 
             cfg = div_cfg.get(item['symbol'], {"m": [], "d": "無", "p": "無", "v": 0.0})
             dy_yield = (cfg['v'] / curr_p * 100) if curr_p > 0 else 0
@@ -118,7 +117,6 @@ df, g_mkt, g_pnl, g_cost, g_months, g_annual, g_re, g_day, g_pay, g_price_alerts
 
 st.title("👾 羅小翔：ETF 報警戰情室")
 
-# 警報區
 if g_price_alerts:
     for msg in g_price_alerts: st.markdown(f'<div class="price-alert-box"><b style="font-size:24px;">🔔 股價警報：</b><br>{msg}</div>', unsafe_allow_html=True)
 
@@ -130,11 +128,11 @@ with col_r2:
     if g_pay:
         for p in g_pay: st.markdown(f'<div class="gold-box"><b>🪙 領息提醒：</b>{p["code"]} ${p["amount"]:,.0f} 於 {p["date"]}</div>', unsafe_allow_html=True)
 
-# 損益面板
-d_color = "#FF4B4B" if g_day >= 0 else "#09AB3B"
-p_color = "#FF4B4B" if g_pnl >= 0 else "#09AB3B"
+# 🎯 顏色邏輯修正：正紅負綠
+d_color = "#FF0000" if g_day >= 0 else "#00FF00"
+p_color = "#FF0000" if g_pnl >= 0 else "#00FF00"
 g_roi = (g_pnl / g_cost * 100) if g_cost > 0 else 0
-roi_color = "#FF4B4B" if g_roi >= 0 else "#09AB3B"
+roi_color = "#FF0000" if g_roi >= 0 else "#00FF00"
 
 c1, c2 = st.columns(2)
 with c1: st.markdown(f"<div style='background-color:#f0f2f6; padding:15px; border-radius:12px; text-align:center;'>今日即時損益<h2 style='color:{d_color};'>${g_day:+,.0f}</h2></div>", unsafe_allow_html=True)
@@ -147,14 +145,18 @@ with cc: st.markdown(f"<div style='border:1px solid #ddd; padding:10px; border-r
 
 st.divider()
 if not df.empty:
-    st.dataframe(df.style.format({"現價":"{:.2f}","今日漲跌":"{:+,.0f}","累積損益":"{:,.0f}","市值":"{:,.0f}","交易量":"{:,.0f}"}), use_container_width=True, hide_index=True)
+    # 🎯 表格顏色邏輯：正紅負綠
+    st.dataframe(
+        df.style.format({"現價":"{:.2f}","今日漲跌":"{:+,.0f}","累積損益":"{:,.0f}","市值":"{:,.0f}","交易量":"{:,.0f}"})
+        .map(lambda x: f'color:{"#FF0000" if (isinstance(x, (int,float)) and x>=0) or str(x).startswith("+") else "#00FF00" if (isinstance(x, (int,float)) and x<0) or str(x).startswith("-") else "black"};font-weight:bold;', subset=['今日漲跌', '累積損益']),
+        use_container_width=True, hide_index=True
+    )
 
 # 📥 匯出 CSV
 summary_text = f"總市值,${g_mkt:,.0f}\n總成本,${g_cost:,.0f}\n總損益,${g_pnl:,.0f}\n總報酬,{g_roi:+.2f}%\n\n"
 csv_data = summary_text + df.to_csv(index=False)
 st.download_button(label="📥 匯出完整報表", data=csv_data.encode('utf-8-sig'), file_name=f"ETF_Report_{datetime.now(tw_tz).strftime('%Y%m%d')}.csv", use_container_width=True)
 
-# --- 🗓️ 全年領息預估 ---
 st.divider()
 st.subheader("🗓️ 全年領息預估")
 for i in range(1, 13, 2):
@@ -168,19 +170,19 @@ for i in range(1, 13, 2):
 
 st.markdown(f"<div style='background-color:#e8f4fd; padding:18px 15px; border-radius:10px; margin-top:20px; border-left: 6px solid #0056b3; display:flex; justify-content:space-between; align-items:center;'><div><span style='font-size:18px; font-weight:900; color:#0056b3;'>🏆 全年領息總結</span></div><div style='text-align:right;'><span style='color:#0056b3; font-weight:900; font-size:26px;'>${g_annual:,.0f}</span></div></div>", unsafe_allow_html=True)
 
-# --- 📝 羅小翔專屬備忘錄 (新增功能) ---
+# 📝 備忘錄區
 st.divider()
 st.subheader("📝 羅小翔專屬備忘錄")
-user_memo = st.text_area("在下面記下你的操盤筆記或生活提醒：", value=st.session_state.my_data.get("memo", ""), height=150)
+user_memo = st.text_area("記下操盤筆記或生活提醒：", value=st.session_state.my_data.get("memo", ""), height=150)
 if st.button("💾 儲存筆記"):
     st.session_state.my_data["memo"] = user_memo
     save_to_json(st.session_state.my_data)
     st.success("筆記儲存成功！")
 
-# --- ⚙️ 管理系統 ---
+# ⚙️ 管理系統
 st.divider()
 st.subheader("⚙️ 標的管理與警報系統")
-with st.expander("⚙️ 修改現有持股與警報 (對照即時股價)"):
+with st.expander("⚙️ 修改現有持股與警報 (對應即時價)"):
     up_list, del_idx = [], -1
     for i, it in enumerate(st.session_state.my_data.get('etfs', [])):
         curr_p = g_price_map.get(it['symbol'], 0.0)
