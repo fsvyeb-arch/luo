@@ -4,33 +4,25 @@
             "symbol": "0056.TW",
             "name": "元大高股息",
             "shares": 4100,
-            "manual_pnl": -1255,
-            "upper": 0.0,
-            "lower": 0.0
+            "manual_pnl": -1255
         },
         {
             "symbol": "00891.TW",
             "name": "中信關鍵半導體",
             "shares": 5000,
-            "manual_pnl": -2116,
-            "upper": 0.0,
-            "lower": 0.0
+            "manual_pnl": -2116
         },
         {
             "symbol": "00919.TW",
             "name": "群益台灣精選高息",
             "shares": 10000,
-            "manual_pnl": 5552,
-            "upper": 0.0,
-            "lower": 0.0
+            "manual_pnl": 5552
         },
         {
             "symbol": "00927.TW",
             "name": "群益半導體收益",
             "shares": 6000,
-            "manual_pnl": 12777,
-            "upper": 0.0,
-            "lower": 0.0
+            "manual_pnl": 12777
         }
     ],
     "daily_history": [
