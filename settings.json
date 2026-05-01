@@ -1,0 +1,40 @@
+{
+    "etfs": [
+        {
+            "symbol": "0056.TW",
+            "name": "元大高股息",
+            "shares": 4100,
+            "cost": 41.11,
+            "manual_pnl": -1255,
+            "div_per_share": 1.07,
+            "freq": 4
+        },
+        {
+            "symbol": "00891.TW",
+            "name": "中信關鍵半導體",
+            "shares": 5000,
+            "cost": 31.3,
+            "manual_pnl": -2116,
+            "div_per_share": 0.4,
+            "freq": 4
+        },
+        {
+            "symbol": "00919.TW",
+            "name": "群益台灣精選高息",
+            "shares": 10000,
+            "cost": 23.04,
+            "manual_pnl": 5552,
+            "div_per_share": 0.72,
+            "freq": 4
+        },
+        {
+            "symbol": "00927.TW",
+            "name": "群益半導體收益",
+            "shares": 6000,
+            "cost": 27.63,
+            "manual_pnl": 12777,
+            "div_per_share": 0.48,
+            "freq": 4
+        }
+    ]
+}
